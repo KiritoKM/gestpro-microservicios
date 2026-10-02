@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Vagrant & VirtualBox
+.vagrant/
+*.vbox
+*.vbox-prev
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs
+*.log
+
+# Databases generadas en tiempo de ejecucion
+backend/**/*.db
+backend/**/*.sqlite
+data/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentos privados de entrega y apuntes
+docs/

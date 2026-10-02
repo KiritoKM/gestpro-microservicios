@@ -1,0 +1,15 @@
+[Unit]
+Description=GestPro Users and Authentication Microservice
+After=network.target
+
+[Service]
+User=gestpro
+WorkingDirectory=/opt/gestpro/backend/service_users
+ExecStart=/opt/gestpro/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8001
+Restart=always
+RestartSec=3
+Environment="PYTHONUNBUFFERED=1"
+Environment="USERS_DB_PATH=/opt/gestpro/data/users.db"
+
+[Install]
+WantedBy=multi-user.target

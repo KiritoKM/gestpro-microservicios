@@ -1,0 +1,73 @@
+---
+- name: Aprovisionamiento del Servidor Frontend (Nginx y Dashboard)
+  hosts: all
+  become: true
+
+  vars:
+    web_dir: /var/www/gestpro/frontend
+
+  tasks:
+    - name: Actualizar cache de apt
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Instalar Nginx y utilidades
+      ansible.builtin.apt:
+        name:
+          - nginx
+          - curl
+        state: present
+
+    - name: Crear directorio para el frontend
+      ansible.builtin.file:
+        path: "{{ web_dir }}"
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: "0755"
+
+    - name: Desplegar archivos estaticos del frontend
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../frontend/"
+        dest: "{{ web_dir }}/"
+        owner: www-data
+        group: www-data
+        mode: "0644"
+
+    - name: Instalar configuracion del sitio en Nginx
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../frontend/nginx/gestpro.conf"
+        dest: /etc/nginx/sites-available/gestpro.conf
+        mode: "0644"
+
+    - name: Habilitar sitio gestpro en Nginx
+      ansible.builtin.file:
+        src: /etc/nginx/sites-available/gestpro.conf
+        dest: /etc/nginx/sites-enabled/gestpro.conf
+        state: link
+
+    - name: Deshabilitar sitio por defecto de Nginx
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Validar sintaxis de configuracion de Nginx
+      ansible.builtin.command:
+        cmd: nginx -t
+      changed_when: false
+
+    - name: Reiniciar y habilitar servicio Nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: restarted
+        enabled: true
+
+    - name: Verificar disponibilidad de la aplicacion web
+      ansible.builtin.uri:
+        url: "http://127.0.0.1/"
+        status_code: 200
+      register: web_result
+      until: web_result.status == 200
+      retries: 5
+      delay: 2

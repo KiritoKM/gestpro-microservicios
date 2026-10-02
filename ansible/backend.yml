@@ -1,0 +1,121 @@
+---
+- name: Aprovisionamiento del Servidor Backend (Microservicios)
+  hosts: all
+  become: true
+
+  vars:
+    app_user: gestpro
+    app_dir: /opt/gestpro
+    venv_dir: /opt/gestpro/venv
+
+  tasks:
+    - name: Actualizar cache de apt
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Instalar paquetes del sistema operativo y Python
+      ansible.builtin.apt:
+        name:
+          - python3
+          - python3-pip
+          - python3-venv
+          - sqlite3
+          - curl
+        state: present
+
+    - name: Crear usuario de sistema para la aplicacion
+      ansible.builtin.user:
+        name: "{{ app_user }}"
+        system: true
+        shell: /bin/bash
+        create_home: false
+
+    - name: Crear estructura de directorios en /opt/gestpro
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: "0755"
+      loop:
+        - "{{ app_dir }}"
+        - "{{ app_dir }}/backend"
+        - "{{ app_dir }}/backend/service_users"
+        - "{{ app_dir }}/backend/service_inventory"
+        - "{{ app_dir }}/backend/service_sales_analytics"
+        - "{{ app_dir }}/data"
+
+    - name: Crear entorno virtual de Python
+      ansible.builtin.command:
+        cmd: python3 -m venv {{ venv_dir }}
+        creates: "{{ venv_dir }}/bin/python"
+
+    - name: Instalar dependencias en el entorno virtual
+      ansible.builtin.pip:
+        virtualenv: "{{ venv_dir }}"
+        name:
+          - fastapi>=0.100.0
+          - uvicorn>=0.22.0
+          - pydantic>=2.0.0
+
+    - name: Copiar microservicio Users
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../backend/service_users/"
+        dest: "{{ app_dir }}/backend/service_users/"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: "0644"
+
+    - name: Copiar microservicio Inventory
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../backend/service_inventory/"
+        dest: "{{ app_dir }}/backend/service_inventory/"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: "0644"
+
+    - name: Copiar microservicio Sales & Analytics
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../backend/service_sales_analytics/"
+        dest: "{{ app_dir }}/backend/service_sales_analytics/"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: "0644"
+
+    - name: Instalar unidades de servicio systemd
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../backend/systemd/{{ item }}"
+        dest: "/etc/systemd/system/{{ item }}"
+        mode: "0644"
+      loop:
+        - gestpro-users.service
+        - gestpro-inventory.service
+        - gestpro-analytics.service
+
+    - name: Recargar configuracion de systemd
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Habilitar e iniciar microservicios
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        enabled: true
+        state: started
+      loop:
+        - gestpro-users
+        - gestpro-inventory
+        - gestpro-analytics
+
+    - name: Verificar que los microservicios responden health check
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ item }}/health"
+        status_code: 200
+      register: health_result
+      until: health_result.status == 200
+      retries: 5
+      delay: 2
+      loop:
+        - 8001
+        - 8002
+        - 8003
